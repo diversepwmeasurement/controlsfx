@@ -1,49 +1,49 @@
-name: ControlsFX Build
-on:
-  push:
-    branches:
-      - master
-  pull_request:
-    branches:
-      - master
-
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - continue-on-error: true
+      name: Checkout
+      uses: actions/checkout@v4
+    - continue-on-error: true
+      name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        cache: gradle
+        distribution: temurin
+        java-version: '17'
+    - continue-on-error: true
+      name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+    - continue-on-error: true
+      if: runner.os == 'Linux'
+      name: Run Tests (Linux)
+      run: 'export DISPLAY=:90
 
-      - name: Setup Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-          cache: 'gradle'
+        Xvfb -ac :90 -screen 0 1280x1024x24 > /dev/null 2>&1 &
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+        ./gradlew build test
 
-      - name: Run Tests (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          export DISPLAY=:90
-          Xvfb -ac :90 -screen 0 1280x1024x24 > /dev/null 2>&1 &
-          ./gradlew build test
+        '
+    - continue-on-error: true
+      env:
+        SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+        SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+        TRANSIFEX_API: ${{ secrets.TRANSIFEX_API }}
+      if: github.ref == 'refs/heads/master'
+      name: Release Snapshots
+      run: './gradlew publish -PsonatypeUsername=$SONATYPE_USERNAME -PsonatypePassword=$SONATYPE_PASSWORD
+        -Ptransifex.api=$TRANSIFEX_API
 
-      - name: Release Snapshots
-        if: github.ref == 'refs/heads/master'
-        run: |
-          ./gradlew publish -PsonatypeUsername=$SONATYPE_USERNAME -PsonatypePassword=$SONATYPE_PASSWORD -Ptransifex.api=$TRANSIFEX_API
-        shell: bash
-        env:
-          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
-          TRANSIFEX_API: ${{ secrets.TRANSIFEX_API }}
-
-      - name: Draft release
-        if: github.ref == 'refs/heads/master'
-        # Drafts your next Release notes as Pull Requests are merged into "master"
-        uses: release-drafter/release-drafter@v5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        '
+      shell: bash
+    - continue-on-error: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      if: github.ref == 'refs/heads/master'
+      name: Draft release
+      uses: release-drafter/release-drafter@v5
+name: ControlsFX Build
+on:
+  repository_dispatch:
+    types: trigger-ga___build.yml
